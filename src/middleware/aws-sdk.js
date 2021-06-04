@@ -12,12 +12,31 @@ const createNewQueue = async function () {
                 FifoQueue: "true",
                 ContentBasedDeduplication: "true",
                 ReceiveMessageWaitTimeSeconds: "20",
-                VisibilityTimeout: "600"
+                VisibilityTimeout: "120"
             },
         }).promise();
         return newSQS.QueueUrl;
     } catch (err) {
         console.log(err)
+    }
+}
+
+const getQueueAttributes = async function (URL) {
+    try {
+        let { data } = await sqs.getQueueAttributes({
+            QueueUrl: URL,
+            AttributeNames: [
+                "ApproximateNumberOfMessages",
+                "ApproximateNumberOfMessagesNotVisible",
+                "ApproximateNumberOfMessagesDelayed"
+            ]
+        }).promise();
+        let numOfMessage = parseInt(data.ApproximateNumberOfMessages)
+        let numOfMessagesNotVisible = parseInt(data.ApproximateNumberOfMessagesNotVisible)
+        let numOfMessagesDelayed = parseInt(data.ApproximateNumberOfMessagesDelayed)
+        return { numOfMessage, numOfMessagesNotVisible, numOfMessagesDelayed };
+    } catch (err) {
+        console.log(err, "failed to receive")
     }
 }
 
@@ -50,4 +69,4 @@ const createMessageToQueue = async function (queueURL, startURL, maxDepth, total
     }
 }
 
-module.exports = { createMessageToQueue, createNewQueue }
+module.exports = { createMessageToQueue, createNewQueue, getQueueAttributes }

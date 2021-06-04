@@ -18,6 +18,8 @@ class Tree {
         this.currentDepth = 0;
         this.currentPage = 0;
         this.isComplete = false;
+        this.numOfNodes = 0;
+        this.pendingDepthIncrease = false;
     }
 }
 
@@ -59,6 +61,26 @@ const updateTree = async function (id, node, root) {
     return root;
 }
 
+const pendingDepthIncrease = async function (queueName) {
+    let tree = await redisGetNodeNTree(queueName);
+    tree.pendingDepthIncrease = true;
+    await insertTreeToRedis(queueName);
+}
+
+const decreamentNumOfNodes = async function (queueName) {
+    let tree = await redisGetNodeNTree(queueName);
+    tree.numOfNodes--;
+    if (tree.numOfNodes === 0) {
+        tree.pendingDepthIncrease = true;
+    }
+    await insertTreeToRedis(tree, queueName);
+}
+
+const updateTreeNumOfNodes = async function (numOfMessagesInQueue, queueName) {
+    let tree = await redisGetNodeNTree(queueName);
+    tree.numOfNodes = numOfMessagesInQueue;
+    await insertTreeToRedis(tree, queueName);
+}
 
 const updateTreePages = async function (queueName, currentDepth) {
     let tree = await redisGetNodeNTree(queueName);
@@ -96,6 +118,12 @@ let createRoot = async function (messageURL, maxTotalPages, maxDepth, id, queueN
     let newTree = new Tree(newNode, maxTotalPages, maxDepth)
     console.log(newTree, "CREATED NEW TREE -----------------------------------------")
     await insertTreeToRedis(newTree, queueName);
+}
+
+const getNumOfNodes = async function (queueName) {
+    let tree = await redisGetNodeNTree(queueName);
+    let numOfNodes = tree.numOfNodes;
+    return numOfNodes;
 }
 
 let insertNodeToRedis = async function (node) {
@@ -139,4 +167,4 @@ const isNodeInDB = async function (URL) {
     return false;
 }
 
-module.exports = { Tree, Node, createRoot, createNode, addNodeToTree, updateTreePages, checkMaxDepthAndMaxPages, isNodeInDB };
+module.exports = { Tree, Node, createRoot, createNode, addNodeToTree, updateTreePages, checkMaxDepthAndMaxPages, isNodeInDB, updateTreeNumOfNodes, decreamentNumOfNodes, getNumOfNodes, pendingDepthIncrease };

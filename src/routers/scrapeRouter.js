@@ -1,9 +1,9 @@
 const express = require("express");
 const router = new express.Router();
 const redisClient = require("../db/redis");
-const { createMessageToQueue, createNewQueue } = require("../middleware/aws-sdk");
+const { createMessageToQueue, createNewQueue, getQueueAttributes } = require("../middleware/aws-sdk");
 const axios = require("axios");
-const { createRoot, createNode, addNodeToTree, updateTreePages, checkMaxDepthAndMaxPages, isNodeInDB } = require("../utils/tree");
+const { createRoot, createNode, addNodeToTree, updateTreePages, checkMaxDepthAndMaxPages, isNodeInDB, updateTreeNumOfNodes, decreamentNumOfNodes, getNumOfNodes, pendingDepthIncrease } = require("../utils/tree");
 
 router.post("/start", async (req, res) => {
     try {
@@ -79,12 +79,20 @@ router.post("/get-data", async (req, res) => {
     let maxTotalPages = req.body.data.maxTotalPages;
     let messageURL = req.body.data.messageURL;
     let currentDepth = req.body.data.currentDepth
+    let queueURL = req.body.QueueURL;
 
     let node = await isNodeInDB(messageURL);
     console.log(node, "nodddddd")
 
     if (id == 0) {
-        let newRoot = await createRoot(messageURL, maxTotalPages, maxDepth, id, queueName, links, pageTitle, node)
+        let newRoot = await createRoot(messageURL, maxTotalPages, maxDepth, id, queueName, links, pageTitle, node);
+        let { data } = await getQueueAttributes(queueURL);
+        let numOfMessage = parseInt(data.numOfMessage);
+        let numOfMessagesNotVisible = parseInt(data.numOfMessagesNotVisible);
+        let numOfMessagesDelayed = parseInt(data.numOfMessagesDelayed);
+
+        await updateTreeNumOfNodes(numOfMessage + numOfMessagesDelayed + numOfMessagesNotVisible, queueName);
+
     } else {
         let isReachedDepthOrPages = await checkMaxDepthAndMaxPages(queueName, currentDepth || 0);
         if (isReachedDepthOrPages) {
@@ -96,6 +104,7 @@ router.post("/get-data", async (req, res) => {
         console.log(newNode)
         console.log("!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@")
         await addNodeToTree(queueName, newNode);
+        await decreamentNumOfNodes(queueName);
     }
     await updateTreePages(queueName, currentDepth || 0)
 })
